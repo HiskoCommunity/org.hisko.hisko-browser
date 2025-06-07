@@ -87,7 +87,6 @@ class CustomWebPage(QWebEnginePage):
             if self.browser_instance and self._current_url_for_history.isValid() and self._current_title_for_history:
                 if not self._current_url_for_history.toString().startswith("about:"):
                     self.browser_instance.add_to_history(self._current_title_for_history, self._current_url_for_history.toString())
-            # Reset flags and data after adding to history
             self._current_url_for_history = QUrl()
             self._current_title_for_history = ""
             self._title_received = False
@@ -459,9 +458,6 @@ class HistoryWidget(QWidget):
 
 
 class DownloadItemWidget(QWidget):
-    """
-    Widget customizado para exibir um item de download na lista.
-    """
     def __init__(self, download_request, parent=None):
         super().__init__(parent)
         self.download_request = download_request
@@ -541,7 +537,7 @@ class DownloadItemWidget(QWidget):
             status_text = f"Baixando... {size_info}"
         elif state == QWebEngineDownloadRequest.DownloadState.DownloadCompleted:
             status_text = f"Concluído! {size_info}"
-            self.progress_bar.setValue(100) # Ensure it's 100%
+            self.progress_bar.setValue(100)
             self.progress_bar.setStyleSheet("""
                 QProgressBar {
                     border: 1px solid #40444b;
@@ -551,7 +547,7 @@ class DownloadItemWidget(QWidget):
                     color: #eee;
                 }
                 QProgressBar::chunk {
-                    background-color: #4CAF50; /* Green for completed */
+                    background-color: #4CAF50;
                     border-radius: 4px;
                 }
             """)
@@ -566,7 +562,7 @@ class DownloadItemWidget(QWidget):
                     color: #eee;
                 }
                 QProgressBar::chunk {
-                    background-color: #FFC107; /* Yellow for cancelled */
+                    background-color: #FFC107;
                     border-radius: 4px;
                 }
             """)
@@ -581,7 +577,7 @@ class DownloadItemWidget(QWidget):
                     color: #eee;
                 }
                 QProgressBar::chunk {
-                    background-color: #F44336; /* Red for interrupted */
+                    background-color: #F44336;
                     border-radius: 4px;
                 }
             """)
@@ -596,12 +592,9 @@ class DownloadItemWidget(QWidget):
 
 
 class DownloadManagerWidget(QWidget):
-    """
-    Widget que exibe a lista de downloads.
-    """
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.download_items = {} # Maps download_request to QListWidgetItem
+        self.download_items = {}
         self.init_ui()
 
     def init_ui(self):
@@ -626,15 +619,15 @@ class DownloadManagerWidget(QWidget):
                 outline: none;
             }
             QListWidget::item {
-                padding: 0px; /* Custom widgets handle their own padding */
-                margin-bottom: 5px; /* Space between items */
+                padding: 0px;
+                margin-bottom: 5px;
                 border-bottom: none;
             }
             QListWidget::item:hover {
-                background-color: transparent; /* Custom widget handles hover */
+                background-color: transparent;
             }
             QListWidget::item:selected {
-                background-color: transparent; /* Custom widget handles selection */
+                background-color: transparent;
             }
         """)
         main_layout.addWidget(self.downloads_list_widget)
@@ -653,29 +646,21 @@ class DownloadManagerWidget(QWidget):
         list_item.setSizeHint(download_item_widget.sizeHint())
         self.downloads_list_widget.addItem(list_item)
         self.downloads_list_widget.setItemWidget(list_item, download_item_widget)
-        self.download_items[download_request] = list_item # Store reference to list item
+        self.download_items[download_request] = list_item
 
-        # Clean up completed/cancelled downloads from list (optional, but good for active view)
         download_request.stateChanged.connect(
             lambda state: self._handle_download_state_change(state, download_request, list_item)
         )
 
     def _handle_download_state_change(self, state, download_request, list_item):
-        # Remove item from internal tracking once it's no longer active
-        if state in (QWebEngineDownloadRequest.DownloadState.DownloadCompleted,
-                      QWebEngineDownloadRequest.DownloadState.DownloadCancelled,
-                      QWebEngineDownloadRequest.DownloadState.DownloadInterrupted):
-            # You might want to keep completed items for a while, or move them to a 'completed' section.
-            # For simplicity, we'll keep them visible but just disconnect and potentially clean up.
-            pass # Keep them in the list for history
+        pass
 
 
 class WebBrowser(QMainWindow):
     HISKO_HOMEPAGE_URL = QUrl("about:hisko")
     HISTORY_PAGE_URL = QUrl("about:history")
-    DOWNLOADS_PAGE_URL = QUrl("about:downloads") # Nova URL para página de downloads
+    DOWNLOADS_PAGE_URL = QUrl("about:downloads")
 
-    # Use QStandardPaths for portable data paths
     APP_DATA_DIR = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)
     CACHE_PATH = os.path.join(APP_DATA_DIR, "hiskodata", "cache")
     STORAGE_PATH = os.path.join(APP_DATA_DIR, "hiskodata", "storage")
@@ -699,7 +684,7 @@ class WebBrowser(QMainWindow):
         self.setMinimumSize(900, 600)
 
         self.session_history = []
-        self.active_downloads = [] # Lista para manter referências aos QWebEngineDownloadRequest
+        self.active_downloads = []
 
         self.navbar = QToolBar("Navigation")
         self.navbar.setMovable(False)
@@ -752,7 +737,6 @@ class WebBrowser(QMainWindow):
         self.history_btn = self._create_btn(SVG_ICONS["history"], self.show_history_page)
         self.navbar.addWidget(self.history_btn)
 
-        # Novo botão para Downloads
         self.downloads_btn = self._create_btn(SVG_ICONS["downloads"], self.show_downloads_page)
         self.navbar.addWidget(self.downloads_btn)
 
@@ -866,27 +850,24 @@ class WebBrowser(QMainWindow):
         self.tabs.setCornerWidget(self._create_new_tab_corner_button(), Qt.Corner.TopRightCorner)
         self.setCentralWidget(self.tabs)
 
-        # Ensure the directories exist
         os.makedirs(self.CACHE_PATH, exist_ok=True)
         os.makedirs(self.STORAGE_PATH, exist_ok=True)
-        os.makedirs(self.DOWNLOAD_DIR, exist_ok=True) # Criar diretório de downloads
+        os.makedirs(self.DOWNLOAD_DIR, exist_ok=True)
 
         self.web_profile = QWebEngineProfile(
             "hiskobrowser_profile",
             self
         )
         self.web_profile.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies)
-        self.web_profile.setPersistentStoragePath(self.STORAGE_PATH) # Use STORAGE_PATH
+        self.web_profile.setPersistentStoragePath(self.STORAGE_PATH)
         self.web_profile.setCachePath(self.CACHE_PATH)
         self.web_profile.setHttpUserAgent(self.CUSTOM_USER_AGENT)
 
         self.ad_blocker = AdBlockInterceptor()
         self.web_profile.setUrlRequestInterceptor(self.ad_blocker)
 
-        # Conectar o sinal de download
         self.web_profile.downloadRequested.connect(self.handle_download_request)
 
-        # Instância do gerenciador de downloads
         self.download_manager = DownloadManagerWidget(self)
 
         self.add_new_tab(self.HISKO_HOMEPAGE_URL, "Home")
@@ -959,7 +940,6 @@ class WebBrowser(QMainWindow):
             self.tabs.setTabIcon(i, QIcon(history_icon_pixmap))
             self.update_urlbar(qurl, history_widget)
         elif qurl == self.DOWNLOADS_PAGE_URL and not existing_browser_view:
-            # Reutiliza a instância do download_manager
             i = self.tabs.addTab(self.download_manager, label)
             self.tabs.setCurrentIndex(i)
             downloads_icon_pixmap = self.svg_to_pixmap(SVG_ICONS["downloads"], 16, 16, "#E0E0E0", True)
@@ -1126,14 +1106,13 @@ class WebBrowser(QMainWindow):
             if not isinstance(current_widget, DownloadManagerWidget):
                 self.add_new_tab(self.DOWNLOADS_PAGE_URL, "Downloads")
             else:
-                # O widget já está no estado correto, apenas atualiza a URL bar
                 self.update_urlbar(self.DOWNLOADS_PAGE_URL, current_widget)
         else:
             if isinstance(current_widget, HiskoHomePageWidget) or \
                isinstance(current_widget, HistoryWidget) or \
                isinstance(current_widget, DownloadManagerWidget):
                 self.tabs.removeTab(current_index)
-                current_widget.deleteLater() # Delete the widget if it's not a permanent one like download_manager
+                current_widget.deleteLater()
 
                 self.add_new_tab(q, "Loading...")
             elif isinstance(current_widget, QWebEngineView):
@@ -1144,9 +1123,7 @@ class WebBrowser(QMainWindow):
             return
 
         widget = self.tabs.widget(i)
-        # Prevent deleting permanent widgets like download_manager
         if widget == self.download_manager:
-            # Just hide the tab, don't delete the widget
             self.tabs.removeTab(i)
         else:
             if widget:
@@ -1201,7 +1178,6 @@ class WebBrowser(QMainWindow):
         elif isinstance(current_widget, HistoryWidget):
             current_widget.update_history_list()
         elif isinstance(current_widget, DownloadManagerWidget):
-            # No reload action for downloads manager, just update view
             pass
 
 
@@ -1263,36 +1239,25 @@ class WebBrowser(QMainWindow):
 
     @pyqtSlot(QWebEngineDownloadRequest)
     def handle_download_request(self, download: QWebEngineDownloadRequest):
-        # Gerar um nome de arquivo sugerido, garantindo que seja um nome de arquivo válido
         suggested_filename = QFileInfo(download.downloadFileName()).fileName()
         if not suggested_filename:
-            # Fallback if suggested name is empty (e.g., direct download of blob)
             suggested_filename = "downloaded_file"
 
-        # Abre uma caixa de diálogo para o usuário escolher onde salvar
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Salvar Arquivo",
-            os.path.join(self.DOWNLOAD_DIR, suggested_filename), # Caminho padrão + nome sugerido
-            "Todos os Arquivos (*);;" # Filtros, adicione mais se necessário
+            os.path.join(self.DOWNLOAD_DIR, suggested_filename),
+            "Todos os Arquivos (*);;"
         )
 
         if file_path:
-            # Define o caminho de download
             download.setDownloadDirectory(QFileInfo(file_path).path())
             download.setDownloadFileName(QFileInfo(file_path).fileName())
 
-            # Aceita o download
             download.accept()
-            # Adiciona o download ao gerenciador de downloads
             self.download_manager.add_download(download)
-            # Opcional: Abrir a aba de downloads automaticamente
-            # self.show_downloads_page()
-            print(f"Download iniciado: {file_path}")
         else:
-            # Cancela o download se o usuário não selecionar um caminho
             download.cancel()
-            print("Download cancelado pelo usuário.")
 
 
 if __name__ == '__main__':
