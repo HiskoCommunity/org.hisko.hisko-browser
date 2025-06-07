@@ -21,5 +21,5 @@ pip install PyQt6 PyQt6-WebEngine
 ```
 and run 
 ```
-ucn install org.hisko.hisko-browser
+ucn install org.hisko.hisko-browser.ucn
 ```
