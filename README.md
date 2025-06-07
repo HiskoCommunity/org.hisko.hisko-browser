@@ -2,7 +2,7 @@ Hisko Browser
 
 Hisko Browser is a sleek, modern web browser built using PyQt6 and Qt WebEngine, designed for the Linux/UCN environment. It features a custom ad-blocker, a streamlined user interface, and essential Browse functionalities like tabbed Browse, history management, and a dedicated downloads section.
 Features
-
+´
     Tabbed Browse: Easily manage multiple web pages with a user-friendly tab interface.
     Ad Blocker: Integrated ad-blocking functionality to provide a cleaner Browse experience.
     Custom Home Page: A visually appealing and functional home page with quick access links and a search bar.
