@@ -1,0 +1,1012 @@
+#!/usr/bin/env python3
+import sys
+import os
+import re
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QTabWidget, QLineEdit, QPushButton, QToolBar,
+    QTabBar, QMenu, QWidget, QVBoxLayout, QLabel, QHBoxLayout, QGridLayout,
+    QMessageBox, QListWidget, QListWidgetItem
+)
+from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineUrlRequestInterceptor
+from PyQt6.QtCore import QUrl, Qt, QSize, pyqtSlot, pyqtSignal as Signal, QPropertyAnimation, QEasingCurve, QStandardPaths
+from PyQt6.QtGui import QIcon, QFont, QPixmap, QPainter, QPalette, QColor, QAction
+from PyQt6.QtSvg import QSvgRenderer
+from PyQt6.QtWebChannel import QWebChannel
+import html
+
+SVG_ICONS = {
+    "back": """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="#E0E0E0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>""",
+    "forward": """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="#E0E0E0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>""",
+    "reload": """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="#E0E0E0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>""",
+    "close": """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="#B0B0B0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="15" y2="15"></line><line x1="1" y1="15" x2="15" y2="1"></line></svg>""",
+    "home": """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="#5865F2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>""",
+    "search": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="#5865F2"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>""",
+    "youtube": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32" fill="#FF0000"><path d="M21.54 10.97l-7.05-4.05a1 1 0 00-1.49.86v8.28a1 1 0 001.49.86l7.05-4.05a1 1 0 000-1.7zm-2.07 4.72a2.38 2.38 0 01-1.69 1.68C17.33 17 12 17 12 17s-5.33 0-6.78-.31a2.38 2.38 0 01-1.69-1.68C3 14.17 3 12 3 12s0-2.17.31-3.69a2.38 2.38 0 011.69-1.68C6.67 5 12 5 12 5s5.33 0 6.78.31a2.38 2.38 0 011.69 1.68C21 9.83 21 12 21 12s0 2.17-.31 3.69z"/></svg>""",
+    "google": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32" fill="#4285F4"><path d="M12.24 10.23c-.27-.72-.62-1.41-1.05-2.04l-.67-.93c-.4-.55-.83-1.07-1.3-1.57C8.75 5.04 8.22 4.54 7.66 4.07c-.03-.02-.06-.05-.09-.07A11.77 11.77 0 0012.24 2c2.47 0 4.5.86 6.07 2.45l-1.84 1.83C15.03 4.96 13.72 4.5 12.24 4.5c-2.47 0-4.5 1.6-5.26 3.96h-2.5v2.27h2.5c-.15.48-.22.99-.22 1.54 0 .55.07 1.06.22 1.54h-2.5v2.27h2.5c.76 2.36 2.79 3.96 5.26 3.96 1.3 0 2.4-.33 3.32-.93a5.53 5.53 0 002.39-2.31l1.83 1.84c-1.57 1.59-3.6 2.45-6.07 2.45-4.7 0-8.54-3.8-8.54-8.5S7.54 2 12.24 2z"/></svg>""",
+    "github": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32" fill="#FFFFFF"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.419 2.864 8.169 6.836 9.489.5.092.682-.217.682-.483 0-.237-.008-.867-.013-1.7c-2.782.604-3.37-1.34-3.37-1.34-.454-1.157-1.11-1.463-1.11-1.463-.908-.62.069-.607.069-.607 1.004.07 1.532 1.03 1.532 1.03.892 1.529 2.342 1.088 2.91.831.091-.645.35-1.088.636-1.337-2.22-.251-4.555-1.11-4.555-4.945 0-1.09.39-1.984 1.03-2.682-.103-.252-.446-1.268.098-2.65S9.43 4.238 12 4.238c2.57 0 3.784.877 4.104 1.638.544 1.382.201 2.398.098 2.65.64.698 1.03 1.592 1.03 2.682 0 3.84-2.339 4.69-4.566 4.935.359.309.678.92.678 1.854 0 1.337-.012 2.417-.012 2.748 0 .269.18.58.688.484C19.138 20.166 22 16.416 22 12 22 6.477 17.523 2 12 2z"/></svg>""",
+    "x": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32" fill="#FFFFFF"><path d="M18.244 2.25h.402l-6.596 7.551L22.955 22H18.51l-5.632-6.223L7.755 22H.994l6.732-7.669L1.22 2.25h4.636l4.632 5.096L18.244 2.25zm-2.827 1.858L7.493 19.82H5.617L14.921 4.108h2.368z"/></svg>""",
+    "linkedin": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32" fill="#0077B5"><path d="M19 0H5a5 5 0 00-5 5v14a5 5 0 005 5h14a5 5 0 005-5V5a5 5 0 00-5-5zM8 19H5V8h3v11zM6.5 6.732c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zM22 19h-3v-5.06c0-2.72-.596-3.037-2.73-3.037-1.813 0-2.07 1.21-.29 3.037V19h-3V8h3v1.897s1.35-2.046 3.003-2.046c3.627 0 4.017 2.378 4.017 5.753V19z"/></svg>""",
+    "stackoverflow": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32" fill="#F48024"><path d="M18.354 20.093c-.876.523-1.854.913-2.906 1.139-1.052.226-2.164.339-3.33.339-1.166 0-2.278-.113-3.33-.339-1.052-.226-2.03-.616-2.906-1.139L3 21v-4h18v4l-2.646-.907zm-1.8-8.293l-1.424 1.424c-1.455.938-3.044 1.4-4.634 1.4-1.59 0-3.18-.462-4.634-1.4l-1.424-1.424-.707.707 1.424 1.424c1.78 1.146 3.794 1.72 5.817 1.72 2.023 0 4.037-.574 5.817-1.72l1.424-1.424-.707-.707zM12.917 8.083l-1.838 1.838-1.414-1.414 1.838-1.838 1.414 1.414zM15.42 4.58l-1.414-1.414-1.838 1.838 1.414 1.414 1.838-1.838zM17.923 2.083l-1.414-1.414-1.838 1.838 1.414 1.414 1.838-1.838z"/></svg>""",
+    "info": """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E0E0E0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>""",
+    "history": """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E0E0E0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>"""
+}
+
+class AdBlockInterceptor(QWebEngineUrlRequestInterceptor):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.ad_domains = [
+            "googleads.g.doubleclick.net",
+            "adservice.google.com",
+            "www.googletagmanager.com",
+            "www.google-analytics.com",
+            "pixel.facebook.com",
+            "analytics.twitter.com",
+            "cdn.jsdelivr.net/gh/uBlockOrigin/uAssets",
+            "ad.doubleclick.net",
+            "ads.yahoo.com",
+            "ad.linksynergy.com",
+            "ad.yieldmanager.com",
+            "pagead2.googlesyndication.com",
+        ]
+
+    def interceptRequest(self, info):
+        host = info.requestUrl().host()
+        if any(d in host for d in self.ad_domains):
+            info.block(True)
+
+class CustomWebPage(QWebEnginePage):
+    def __init__(self, profile, parent=None, browser_instance=None):
+        super().__init__(profile, parent)
+        self.profile = profile
+        self.browser_instance = browser_instance
+        self.urlChanged.connect(self._on_url_changed_for_history)
+        self.titleChanged.connect(self._on_title_changed_for_history)
+        self._current_url_for_history = QUrl()
+        self._current_title_for_history = ""
+        self._title_received = False
+        self._url_received = False
+
+    def _on_url_changed_for_history(self, qurl):
+        self._current_url_for_history = qurl
+        self._url_received = True
+        self._add_to_history_if_ready()
+
+    def _on_title_changed_for_history(self, title):
+        self._current_title_for_history = title
+        self._title_received = True
+        self._add_to_history_if_ready()
+
+    def _add_to_history_if_ready(self):
+        if self._url_received and self._title_received:
+            if self.browser_instance and self._current_url_for_history.isValid() and self._current_title_for_history:
+                if not self._current_url_for_history.toString().startswith("about:"):
+                    self.browser_instance.add_to_history(self._current_title_for_history, self._current_url_for_history.toString())
+            # Reset flags and data after adding to history
+            self._current_url_for_history = QUrl()
+            self._current_title_for_history = ""
+            self._title_received = False
+            self._url_received = False
+
+    def createWindow(self, type):
+        if type == QWebEnginePage.WebWindowType.WebBrowserWindow:
+            if self.browser_instance:
+                new_browser_view = QWebEngineView()
+                new_browser_view.setPage(CustomWebPage(self.profile, new_browser_view, self.browser_instance))
+                self.browser_instance.add_new_tab(QUrl(), "New Window", existing_browser_view=new_browser_view)
+                return new_browser_view.page()
+        return super().createWindow(type)
+
+    def contextMenuEvent(self, event):
+        menu = QMenu(self.view())
+        page = self.view().page()
+
+        inspect_action = QAction("Inspect Element (F12)", self)
+        inspect_action.triggered.connect(self.open_developer_tools)
+        menu.addAction(inspect_action)
+
+        hit_test_result = page.hitTestContent(event.pos())
+        link_url = hit_test_result.linkUrl()
+
+        if link_url.isValid() and link_url.toString() != "":
+            open_link_new_tab_action = QAction("Open Link in New Tab", self)
+            open_link_new_tab_action.triggered.connect(lambda: self.browser_instance.add_new_tab(link_url, "New Tab"))
+            menu.addAction(open_link_new_tab_action)
+
+            copy_link_action = QAction("Copy Link Address", self)
+            copy_link_action.triggered.connect(lambda: QApplication.clipboard().setText(link_url.toString()))
+            menu.addAction(copy_link_action)
+
+        menu.exec(event.globalPos())
+
+    def open_developer_tools(self):
+        dev_tools_page = QWebEnginePage(self.profile)
+        dev_tools_page.setInspectedPage(self)
+        dev_tools_window = QMainWindow()
+        dev_tools_window.setCentralWidget(QWebEngineView())
+        dev_tools_window.centralWidget().setPage(dev_tools_page)
+        dev_tools_window.setWindowTitle("Developer Tools - Hisko Browser")
+        dev_tools_window.resize(1000, 700)
+        dev_tools_window.show()
+
+class HiskoHomePageWidget(QWidget):
+    search_requested = Signal(str)
+    quick_link_requested = Signal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.init_ui()
+
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        content_wrapper = QWidget()
+        content_layout = QVBoxLayout(content_wrapper)
+        content_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        content_layout.setContentsMargins(50, 50, 50, 50)
+
+        title_label = QLabel("Hisko")
+        title_font = QFont("Poppins", 140, QFont.Weight.Bold)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet("""
+            QLabel {
+                color: #E0E0E0;
+                padding-bottom: 30px;
+                text-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+            }
+        """)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        content_layout.addWidget(title_label)
+
+        search_wrapper = QWidget()
+        search_wrapper_layout = QHBoxLayout(search_wrapper)
+        search_wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        search_wrapper_layout.setSpacing(0)
+
+        icon_label = QLabel()
+        if hasattr(self.parent(), 'svg_to_pixmap'):
+            icon_pixmap = self.parent().svg_to_pixmap(SVG_ICONS["search"], 24, 24, "#5865F2", True)
+        else:
+            renderer = QSvgRenderer(bytearray(SVG_ICONS["search"].encode('utf-8')))
+            icon_pixmap = QPixmap(24, 24)
+            icon_pixmap.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(icon_pixmap)
+            renderer.render(painter)
+            painter.end()
+
+        icon_label.setPixmap(icon_pixmap)
+        icon_label.setFixedSize(24, 24)
+        icon_label.setStyleSheet("padding-left: 16px; padding-right: 12px;")
+
+        self.search_bar_pyqt = QLineEdit()
+        self.search_bar_pyqt.setPlaceholderText("Search on Google or type a URL")
+        self.search_bar_pyqt.setFont(QFont("Poppins", 11))
+        self.search_bar_pyqt.setStyleSheet("""
+            QLineEdit {
+                background: #2f3136;
+                border: none;
+                border-top-right-radius: 24px;
+                border-bottom-right-radius: 24px;
+                padding: 12px 20px;
+                color: #eee;
+                selection-background-color: #5865F2;
+                box-shadow: inset 0 0 8px rgba(0,0,0,0.3), 0 4px 12px rgba(88, 101, 242, 0.2);
+                transition: all 0.3s ease;
+            }
+            QLineEdit:focus {
+                background: #40444b;
+                outline: none;
+                box-shadow: inset 0 0 12px rgba(88, 101, 242, 0.5), 0 6px 20px rgba(88, 101, 242, 0.4);
+            }
+        """)
+        self.search_bar_pyqt.setFixedHeight(48)
+        self.search_bar_pyqt.returnPressed.connect(self._on_search_bar_return_pressed)
+
+        icon_wrapper = QWidget()
+        icon_wrapper.setLayout(QHBoxLayout())
+        icon_wrapper.layout().setContentsMargins(0,0,0,0)
+        icon_wrapper.layout().setSpacing(0)
+        icon_wrapper.layout().addWidget(icon_label)
+        icon_wrapper.setStyleSheet("""
+            QWidget {
+                background: #2f3136;
+                border-top-left-radius: 24px;
+                border-bottom-left-radius: 24px;
+                padding: 0;
+            }
+        """)
+        icon_wrapper.setFixedSize(48, 48)
+
+        search_wrapper_layout.addWidget(icon_wrapper)
+        search_wrapper_layout.addWidget(self.search_bar_pyqt)
+        search_wrapper_layout.setStretch(0, 0)
+        search_wrapper_layout.setStretch(1, 1)
+        content_layout.addWidget(search_wrapper)
+
+        quick_links_label = QLabel("Quick Access")
+        quick_links_label.setFont(QFont("Poppins", 10, QFont.Weight.DemiBold))
+        quick_links_label.setStyleSheet("color: #bbb; margin-top: 30px; margin-bottom: 15px;")
+        quick_links_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        content_layout.addWidget(quick_links_label)
+
+        quick_links_grid = QGridLayout()
+        quick_links_grid.setSpacing(20)
+        quick_links_grid.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        links_data = [
+            ("Google", "https://www.google.com", "google", False),
+            ("YouTube", "https://www.youtube.com", "youtube", False),
+            ("GitHub", "https://github.com", "github", True),
+            ("X (Twitter)", "https://x.com", "x", True),
+            ("LinkedIn", "https://www.linkedin.com", "linkedin", False),
+            ("Stack Overflow", "https://stackoverflow.com", "stackoverflow", False),
+        ]
+
+        row = 0
+        col = 0
+        for name, url, icon_key, force_white_icon in links_data:
+            link_button = self._create_quick_link_button(name, url, icon_key, force_white_icon)
+            quick_links_grid.addWidget(link_button, row, col)
+            col += 1
+            if col > 2:
+                col = 0
+                row += 1
+        content_layout.addLayout(quick_links_grid)
+
+        content_layout.addStretch(1)
+        main_layout.addWidget(content_wrapper)
+        main_layout.addStretch(1)
+
+        self.setStyleSheet("""
+            QWidget#HiskoHomePageWidget {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1F2023, stop:1 #2a2c30);
+            }
+            QWidget#HiskoHomePageWidget > QWidget {
+                background: rgba(47, 49, 54, 0.7);
+                border-radius: 20px;
+                border: 1px solid rgba(88, 101, 242, 0.3);
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(88, 101, 242, 0.2);
+                min-width: 600px;
+                max-width: 800px;
+            }
+            QLabel {
+                color: #eee;
+            }
+        """)
+        self.setObjectName("HiskoHomePageWidget")
+
+    def _create_quick_link_button(self, name, url, icon_key, force_white_icon):
+        btn = QPushButton()
+        btn.setFixedSize(90, 90)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.clicked.connect(lambda: self.quick_link_requested.emit(url))
+
+        layout = QVBoxLayout(btn)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(5)
+
+        icon_label = QLabel()
+        if hasattr(self.parent(), 'svg_to_pixmap'):
+            if force_white_icon:
+                icon_pixmap = self.parent().svg_to_pixmap(SVG_ICONS[icon_key], 32, 32, "#FFFFFF", True)
+            else:
+                icon_pixmap = self.parent().svg_to_pixmap(SVG_ICONS[icon_key], 32, 32, None, False)
+        else:
+            renderer = QSvgRenderer(bytearray(SVG_ICONS[icon_key].encode('utf-8')))
+            icon_pixmap = QPixmap(32, 32)
+            icon_pixmap.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(icon_pixmap)
+            renderer.render(painter)
+            painter.end()
+
+        icon_label.setPixmap(icon_pixmap)
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        name_label = QLabel(name)
+        name_label.setFont(QFont("Poppins", 9, QFont.Weight.Medium))
+        name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        name_label.setStyleSheet("color: #ccc;")
+
+        layout.addWidget(icon_label)
+        layout.addWidget(name_label)
+
+        btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(47, 49, 54, 0.5);
+                border: 1px solid rgba(88, 101, 242, 0.2);
+                border-radius: 15px;
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+                transition: all 0.2s ease;
+            }
+            QPushButton:hover {
+                background: rgba(88, 101, 242, 0.6);
+                border-color: #5865F2;
+                box-shadow: 0 8px 25px rgba(88, 101, 242, 0.5);
+                transform: translateY(-3px);
+            }
+            QPushButton:pressed {
+                background: rgba(60, 70, 200, 0.7);
+                border-color: #40444b;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+                transform: translateY(0);
+            }
+            QPushButton QLabel {
+                color: #eee;
+            }
+            QPushButton:hover QLabel {
+                color: white;
+            }
+        """)
+        return btn
+
+    def _on_search_bar_return_pressed(self):
+        query = self.search_bar_pyqt.text().strip()
+        if query:
+            self.search_requested.emit(query)
+
+class HistoryWidget(QWidget):
+    open_url_requested = Signal(str)
+
+    def __init__(self, parent=None, history_data=None):
+        super().__init__(parent)
+        self.history_data = history_data if history_data is not None else []
+        self.init_ui()
+
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
+
+        title_label = QLabel("Browser History")
+        title_label.setFont(QFont("Poppins", 18, QFont.Weight.Bold))
+        title_label.setStyleSheet("color: #E0E0E0;")
+        main_layout.addWidget(title_label)
+
+        self.history_list_widget = QListWidget()
+        self.history_list_widget.setFont(QFont("Poppins", 10))
+        self.history_list_widget.setStyleSheet("""
+            QListWidget {
+                background: #2f3136;
+                border: 1px solid #40444b;
+                border-radius: 10px;
+                color: #eee;
+                padding: 10px;
+                outline: none;
+            }
+            QListWidget::item {
+                padding: 8px 10px;
+                border-bottom: 1px solid #3a3c41;
+            }
+            QListWidget::item:last {
+                border-bottom: none;
+            }
+            QListWidget::item:hover {
+                background-color: #40444b;
+            }
+            QListWidget::item:selected {
+                background-color: #5865F2;
+                color: white;
+            }
+        """)
+        self.history_list_widget.itemClicked.connect(self._on_item_clicked)
+        main_layout.addWidget(self.history_list_widget)
+
+        clear_history_button = QPushButton("Clear History")
+        clear_history_button.setFont(QFont("Poppins", 10, QFont.Weight.DemiBold))
+        clear_history_button.setStyleSheet("""
+            QPushButton {
+                background-color: #ED4245;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 15px;
+            }
+            QPushButton:hover {
+                background-color: #C73437;
+            }
+            QPushButton:pressed {
+                background-color: #A0282A;
+            }
+        """)
+        clear_history_button.clicked.connect(self.clear_history)
+        main_layout.addWidget(clear_history_button, alignment=Qt.AlignmentFlag.AlignRight)
+
+        self.update_history_list()
+        self.setStyleSheet("""
+            QWidget#HistoryWidget {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1F2023, stop:1 #2a2c30);
+                border-radius: 15px;
+            }
+        """)
+        self.setObjectName("HistoryWidget")
+
+    def update_history_list(self):
+        self.history_list_widget.clear()
+        for title, url in reversed(self.history_data):
+            display_text = f"{title}\n<span style='color:#bbb; font-size:9pt;'>{url}</span>"
+            item = QListWidgetItem(display_text)
+            item.setData(Qt.ItemDataRole.UserRole, url)
+            self.history_list_widget.addItem(item)
+            item.setTextAlignment(Qt.AlignmentFlag.AlignLeft)
+
+    def add_entry(self, title, url):
+        self.history_data.append((title, url))
+        self.update_history_list()
+
+    def clear_history(self):
+        reply = QMessageBox.question(self, 'Clear History',
+                                     "Are you sure you want to clear all Browse history for this session?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                     QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            self.history_data.clear()
+            self.update_history_list()
+            QMessageBox.information(self, "History Cleared", "Browse history has been cleared for this session.")
+
+    def _on_item_clicked(self, item):
+        url = item.data(Qt.ItemDataRole.UserRole)
+        if url:
+            self.open_url_requested.emit(url)
+
+
+class WebBrowser(QMainWindow):
+    HISKO_HOMEPAGE_URL = QUrl("about:hisko")
+    HISTORY_PAGE_URL = QUrl("about:history")
+    
+    # Use QStandardPaths for portable data paths
+    APP_DATA_DIR = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)
+    CACHE_PATH = os.path.join(APP_DATA_DIR, "hiskodata", "cache")
+    STORAGE_PATH = os.path.join(APP_DATA_DIR, "hiskodata", "storage")
+
+    COMMON_TLDS = [
+        ".com", ".org", ".net", ".info", ".biz", ".co",
+        ".io", ".xyz", ".app", ".dev", ".online", ".store",
+        ".tech", ".site", ".blog", ".news", ".gov", ".edu",
+        ".mil", ".int", ".arpa", ".br", ".us", ".uk", ".ca",
+        ".de", ".fr", ".jp", ".in", ".ru", ".cn", ".au", ".mx"
+    ]
+
+    CUSTOM_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 HiskoBrowser/1.0 (Linux/UCN)"
+
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("Hisko Browser")
+        self.resize(1280, 860)
+        self.setMinimumSize(900, 600)
+
+        self.session_history = []
+
+        self.navbar = QToolBar("Navigation")
+        self.navbar.setMovable(False)
+        self.navbar.setIconSize(QSize(24, 24))
+        self.navbar.setStyleSheet("""
+            QToolBar {
+                background-color: #23252a;
+                border-bottom: 1px solid #2f3136;
+                padding: 6px 12px;
+            }
+            QToolButton {
+                background: transparent;
+                border: none;
+                margin: 0 6px;
+                padding: 8px;
+                border-radius: 12px;
+            }
+            QToolButton:hover {
+                background-color: #5865F2;
+            }
+        """)
+        self.addToolBar(self.navbar)
+
+        self.back_btn = self._create_btn(SVG_ICONS["back"], self.go_back)
+        self.forward_btn = self._create_btn(SVG_ICONS["forward"], self.go_forward)
+        self.reload_btn = self._create_btn(SVG_ICONS["reload"], self.reload_page)
+        self.navbar.addWidget(self.back_btn)
+        self.navbar.addWidget(self.forward_btn)
+        self.navbar.addWidget(self.reload_btn)
+
+        self.url_bar = QLineEdit()
+        self.url_bar.setFont(QFont("Poppins", 11))
+        self.url_bar.setStyleSheet("""
+            QLineEdit {
+                background: #2f3136;
+                border: none;
+                border-radius: 14px;
+                padding: 8px 14px;
+                color: #ddd;
+                selection-background-color: #5865F2;
+            }
+            QLineEdit:focus {
+                background: #40444b;
+                outline: none;
+            }
+        """)
+        self.url_bar.returnPressed.connect(self.navigate_to_url)
+        self.navbar.addWidget(self.url_bar)
+
+        self.history_btn = self._create_btn(SVG_ICONS["history"], self.show_history_page)
+        self.navbar.addWidget(self.history_btn)
+
+        self.info_btn = self._create_btn(SVG_ICONS["info"], self.show_about_dialog)
+        self.navbar.addWidget(self.info_btn)
+
+
+        self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
+        self.tabs.setTabsClosable(True)
+        self.tabs.tabCloseRequested.connect(self.close_tab)
+        self.tabs.currentChanged.connect(self.current_tab_changed)
+
+        self.tabs.setStyleSheet("""
+            QTabWidget::pane {
+                border: none;
+                background: #1F2023;
+            }
+            QTabBar::tab {
+                background: #2f3136;
+                color: #999;
+                padding: 10px 20px;
+                margin-right: 4px;
+                border-top-left-radius: 10px;
+                border-top-right-radius: 10px;
+                font-weight: 600;
+                min-width: 120px;
+                max-width: 200px;
+                padding-left: 30px;
+                text-align: left;
+            }
+            QTabBar::tab:selected {
+                background: #5865F2;
+                color: white;
+                font-weight: 700;
+            }
+            QTabBar::close-button {
+                image: none;
+                subcontrol-origin: padding;
+                subcontrol-position: center right;
+                width: 16px;
+                height: 16px;
+                margin-left: 5px;
+                margin-right: 0px;
+                padding: 2px;
+                border-radius: 8px;
+            }
+            QTabBar::close-button:hover {
+                background-color: rgba(255, 255, 255, 0.2);
+            }
+            QTabWidget::corner-widget {
+                background-color: #2f3136;
+                height: 40px;
+                border-top-right-radius: 10px;
+                border-top: 1px solid #2f3136;
+                margin-right: 0px;
+            }
+            QTabWidget::corner-widget QPushButton {
+                background: #2f3136;
+                color: #5865F2;
+                font-weight: bold;
+                font-size: 20px;
+                border: 1px solid #5865F2;
+                border-radius: 15px;
+                width: 30px;
+                height: 30px;
+                padding: 0;
+            }
+            QTabWidget::corner-widget QPushButton:hover {
+                background-color: #5865F2;
+                color: white;
+                border-color: #5865F2;
+            }
+            QTabWidget::corner-widget QPushButton:pressed {
+                background-color: #40444b;
+                color: #99aab5;
+            }
+            QMenu {
+                background-color: #2f3136;
+                border: 1px solid #40444b;
+                color: #ddd;
+                padding: 5px;
+            }
+            QMenu::item {
+                padding: 5px 15px;
+                background-color: transparent;
+            }
+            QMenu::item:selected {
+                background-color: #5865F2;
+                color: white;
+            }
+            QMessageBox {
+                background-color: #2f3136;
+                color: #eee;
+            }
+            QMessageBox QLabel {
+                color: #eee;
+            }
+            QMessageBox QPushButton {
+                background-color: #5865F2;
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                border-radius: 5px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #40444b;
+            }
+        """)
+
+        self.tabs.setCornerWidget(self._create_new_tab_corner_button(), Qt.Corner.TopRightCorner)
+        self.setCentralWidget(self.tabs)
+
+        # Ensure the directories exist
+        os.makedirs(self.CACHE_PATH, exist_ok=True)
+        os.makedirs(self.STORAGE_PATH, exist_ok=True)
+
+        self.web_profile = QWebEngineProfile(
+            "hiskobrowser_profile",
+            self
+        )
+        self.web_profile.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies)
+        self.web_profile.setPersistentStoragePath(self.STORAGE_PATH) # Use STORAGE_PATH
+        self.web_profile.setCachePath(self.CACHE_PATH)
+        self.web_profile.setHttpUserAgent(self.CUSTOM_USER_AGENT)
+
+        self.ad_blocker = AdBlockInterceptor()
+        self.web_profile.setUrlRequestInterceptor(self.ad_blocker)
+
+        self.add_new_tab(self.HISKO_HOMEPAGE_URL, "Home")
+
+        self.dev_tools_action = QAction("Inspect (F12)", self)
+        self.dev_tools_action.setShortcut(Qt.Key.Key_F12)
+        self.dev_tools_action.triggered.connect(self._open_developer_tools_current_page)
+        self.addAction(self.dev_tools_action)
+
+    def _create_btn(self, svg_data, callback):
+        icon = QIcon(self.svg_to_pixmap(svg_data, 24, 24, "#E0E0E0", False))
+        btn = QPushButton()
+        btn.setIcon(icon)
+        btn.setIconSize(QSize(24, 24))
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setStyleSheet("""
+            QPushButton {
+                border: none;
+                background: transparent;
+                padding: 6px;
+                border-radius: 12px;
+            }
+            QPushButton:hover {
+                background-color: #5865F2;
+            }
+        """)
+        btn.clicked.connect(callback)
+        return btn
+
+    def _create_new_tab_corner_button(self):
+        btn = QPushButton("+")
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setFixedSize(30, 30)
+        btn.clicked.connect(lambda: self.add_new_tab(self.HISKO_HOMEPAGE_URL, "Home"))
+        return btn
+
+    def svg_to_pixmap(self, svg_data, width, height, stroke_color=None, ignore_fill=False):
+        if stroke_color:
+            svg_data = re.sub(r'stroke="[^"]*"', f'stroke="{stroke_color}"', svg_data)
+            if not ignore_fill and "fill=\"none\"" not in svg_data:
+                svg_data = re.sub(r'fill="[^"]*"', f'fill="{stroke_color}"', svg_data)
+
+        renderer = QSvgRenderer(bytearray(svg_data.encode('utf-8')))
+        pixmap = QPixmap(width, height)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        renderer.render(painter)
+        painter.end()
+        return pixmap
+
+    def add_new_tab(self, qurl=None, label="New Tab", existing_browser_view=None):
+        if qurl is None:
+            qurl = self.HISKO_HOMEPAGE_URL
+
+        if qurl == self.HISKO_HOMEPAGE_URL and not existing_browser_view:
+            home_page_widget = HiskoHomePageWidget(self)
+            home_page_widget.search_requested.connect(self.navigate_to_url)
+            home_page_widget.quick_link_requested.connect(self.navigate_to_url)
+            i = self.tabs.addTab(home_page_widget, label)
+            self.tabs.setCurrentIndex(i)
+            home_icon_pixmap = self.svg_to_pixmap(SVG_ICONS["home"], 16, 16, "#5865F2", True)
+            self.tabs.setTabIcon(i, QIcon(home_icon_pixmap))
+            self.update_urlbar(qurl, home_page_widget)
+        elif qurl == self.HISTORY_PAGE_URL and not existing_browser_view:
+            history_widget = HistoryWidget(self, self.session_history)
+            history_widget.open_url_requested.connect(self.navigate_to_url)
+            i = self.tabs.addTab(history_widget, label)
+            self.tabs.setCurrentIndex(i)
+            history_icon_pixmap = self.svg_to_pixmap(SVG_ICONS["history"], 16, 16, "#E0E0E0", True)
+            self.tabs.setTabIcon(i, QIcon(history_icon_pixmap))
+            self.update_urlbar(qurl, history_widget)
+        else:
+            if existing_browser_view:
+                browser = existing_browser_view
+            else:
+                browser = QWebEngineView()
+                browser.setPage(CustomWebPage(self.web_profile, browser, self))
+
+            browser.urlChanged.connect(lambda qurl_val, browser_val=browser: self.update_urlbar(qurl_val, browser_val))
+            browser.loadFinished.connect(lambda _, browser_val=browser: self.update_tab_content(browser_val))
+            browser.iconChanged.connect(lambda icon_val, browser_val=browser: self.update_tab_icon(icon_val, browser_val))
+
+            browser.page().runJavaScript("document.write('<script src=\"qrc:///qtwebchannel/qwebchannel.js\"></script>');")
+
+            channel = QWebChannel(browser.page())
+            channel.registerObject("browser", self)
+            browser.page().setWebChannel(channel)
+
+            i = self.tabs.addTab(browser, label)
+            self.tabs.setCurrentIndex(i)
+            if qurl and qurl.isValid():
+                browser.setUrl(qurl)
+
+
+        close_btn_for_this_tab = self._create_close_button_for_tab(i)
+        self.tabs.tabBar().setTabButton(i, QTabBar.ButtonPosition.RightSide, close_btn_for_this_tab)
+
+    def _create_close_button_for_tab(self, tab_index):
+        close_btn = QPushButton()
+        close_btn.setFixedSize(20, 20)
+        close_btn.setIcon(QIcon(self.svg_to_pixmap(SVG_ICONS["close"], 16, 16, "#B0B0B0", False)))
+        close_btn.setIconSize(QSize(12, 12))
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: none;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.2);
+            }
+            QPushButton:pressed {
+                background-color: rgba(255, 255, 255, 0.3);
+            }
+        """)
+        close_btn.clicked.connect(lambda: self.close_tab(tab_index))
+        return close_btn
+
+    def update_tab_content(self, widget):
+        i = self.tabs.indexOf(widget)
+        if i != -1:
+            if isinstance(widget, QWebEngineView):
+                title = widget.page().title() or "New Tab"
+                title = html.unescape(title)
+                self.tabs.setTabText(i, title)
+                self.update_tab_icon(widget.icon(), widget)
+            elif isinstance(widget, HiskoHomePageWidget):
+                self.tabs.setTabText(i, "Home")
+                home_icon_pixmap = self.svg_to_pixmap(SVG_ICONS["home"], 16, 16, "#5865F2", True)
+                self.tabs.setTabIcon(i, QIcon(home_icon_pixmap))
+            elif isinstance(widget, HistoryWidget):
+                self.tabs.setTabText(i, "History")
+                history_icon_pixmap = self.svg_to_pixmap(SVG_ICONS["history"], 16, 16, "#E0E0E0", True)
+                self.tabs.setTabIcon(i, QIcon(history_icon_pixmap))
+
+
+    def update_tab_icon(self, icon, widget):
+        i = self.tabs.indexOf(widget)
+        if i != -1:
+            if isinstance(widget, QWebEngineView):
+                if not icon.isNull():
+                    self.tabs.setTabIcon(i, icon)
+                elif widget.url() == self.HISKO_HOMEPAGE_URL:
+                    home_icon_pixmap = self.svg_to_pixmap(SVG_ICONS["home"], 16, 16, "#5865F2", True)
+                    self.tabs.setTabIcon(i, QIcon(home_icon_pixmap))
+                elif widget.url() == self.HISTORY_PAGE_URL:
+                    history_icon_pixmap = self.svg_to_pixmap(SVG_ICONS["history"], 16, 16, "#E0E0E0", True)
+                    self.tabs.setTabIcon(i, QIcon(history_icon_pixmap))
+                else:
+                    self.tabs.setTabIcon(i, QIcon())
+            elif isinstance(widget, HiskoHomePageWidget):
+                home_icon_pixmap = self.svg_to_pixmap(SVG_ICONS["home"], 16, 16, "#5865F2", True)
+                self.tabs.setTabIcon(i, QIcon(home_icon_pixmap))
+            elif isinstance(widget, HistoryWidget):
+                history_icon_pixmap = self.svg_to_pixmap(SVG_ICONS["history"], 16, 16, "#E0E0E0", True)
+                self.tabs.setTabIcon(i, QIcon(history_icon_pixmap))
+
+    def update_urlbar(self, q, widget=None):
+        if widget != self.tabs.currentWidget():
+            return
+        if isinstance(widget, QWebEngineView):
+            url = q.toString()
+            if q == self.HISKO_HOMEPAGE_URL:
+                self.url_bar.setText("about:hisko")
+            elif q == self.HISTORY_PAGE_URL:
+                self.url_bar.setText("about:history")
+            else:
+                self.url_bar.setText(url)
+        elif isinstance(widget, HiskoHomePageWidget):
+            self.url_bar.setText("about:hisko")
+        elif isinstance(widget, HistoryWidget):
+            self.url_bar.setText("about:history")
+        self.url_bar.setCursorPosition(0)
+
+    def navigate_to_url(self, url_text=None):
+        if url_text is None:
+            url_text = self.url_bar.text().strip()
+
+        if not url_text:
+            return
+
+        q = QUrl()
+        if url_text == "about:hisko":
+            q = self.HISKO_HOMEPAGE_URL
+        elif url_text == "about:history":
+            q = self.HISTORY_PAGE_URL
+        elif url_text.startswith(("http://", "https://")):
+            q = QUrl(url_text)
+        elif any(url_text.endswith(tld) for tld in self.COMMON_TLDS):
+            q = QUrl("https://" + url_text)
+        else:
+            search_query = QUrl.toPercentEncoding(url_text)
+            q = QUrl(f"https://www.google.com/search?q={search_query.data().decode()}")
+
+        if not q.isValid():
+            search_query = QUrl.toPercentEncoding(url_text)
+            q = QUrl(f"https://www.google.com/search?q={search_query.data().decode()}")
+
+        current_widget = self.tabs.currentWidget()
+        current_index = self.tabs.currentIndex()
+
+        if q == self.HISKO_HOMEPAGE_URL:
+            if not isinstance(current_widget, HiskoHomePageWidget):
+                self.add_new_tab(self.HISKO_HOMEPAGE_URL, "Home")
+            else:
+                self.update_urlbar(self.HISKO_HOMEPAGE_URL, current_widget)
+        elif q == self.HISTORY_PAGE_URL:
+            if not isinstance(current_widget, HistoryWidget):
+                self.add_new_tab(self.HISTORY_PAGE_URL, "History")
+            else:
+                current_widget.update_history_list()
+                self.update_urlbar(self.HISTORY_PAGE_URL, current_widget)
+        else:
+            if isinstance(current_widget, HiskoHomePageWidget) or isinstance(current_widget, HistoryWidget):
+                self.tabs.removeTab(current_index)
+                current_widget.deleteLater()
+
+                self.add_new_tab(q, "Loading...")
+            elif isinstance(current_widget, QWebEngineView):
+                current_widget.setUrl(q)
+
+    def close_tab(self, i):
+        if i < 0 or i >= self.tabs.count():
+            return
+
+        widget = self.tabs.widget(i)
+        if widget:
+            widget.deleteLater()
+
+        self.tabs.tabBar().setTabButton(i, QTabBar.ButtonPosition.RightSide, None)
+
+        self.tabs.removeTab(i)
+
+        if self.tabs.count() == 0:
+            self.add_new_tab(self.HISKO_HOMEPAGE_URL, "Home")
+        elif i == self.tabs.currentIndex() and self.tabs.count() > 0:
+            if i > 0:
+                self.tabs.setCurrentIndex(i - 1)
+            else:
+                self.tabs.setCurrentIndex(0)
+
+
+    def current_tab_changed(self, i):
+        if i == -1:
+            return
+        current_widget = self.tabs.widget(i)
+        if current_widget:
+            if isinstance(current_widget, QWebEngineView):
+                qurl = current_widget.url()
+                self.update_urlbar(qurl, current_widget)
+            elif isinstance(current_widget, HiskoHomePageWidget):
+                self.update_urlbar(self.HISKO_HOMEPAGE_URL, current_widget)
+            elif isinstance(current_widget, HistoryWidget):
+                self.update_urlbar(self.HISTORY_PAGE_URL, current_widget)
+                current_widget.update_history_list()
+
+    def go_back(self):
+        current_widget = self.tabs.currentWidget()
+        if isinstance(current_widget, QWebEngineView):
+            current_widget.back()
+
+    def go_forward(self):
+        current_widget = self.tabs.currentWidget()
+        if isinstance(current_widget, QWebEngineView):
+            current_widget.forward()
+
+    def reload_page(self):
+        current_widget = self.tabs.currentWidget()
+        if isinstance(current_widget, QWebEngineView):
+            current_widget.reload()
+        elif isinstance(current_widget, HiskoHomePageWidget):
+            current_widget.search_bar_pyqt.clear()
+        elif isinstance(current_widget, HistoryWidget):
+            current_widget.update_history_list()
+
+
+    @pyqtSlot(str)
+    def updateUrlBarAndNavigate(self, url):
+        self.navigate_to_url(url)
+
+    def _open_developer_tools_current_page(self):
+        current_widget = self.tabs.currentWidget()
+        if isinstance(current_widget, QWebEngineView) and isinstance(current_widget.page(), CustomWebPage):
+            current_widget.page().open_developer_tools()
+        else:
+            print("Developer Tools not available for this page (not a QWebEngineView).")
+
+    def show_about_dialog(self):
+        about_dialog = QMessageBox(self)
+        about_dialog.setWindowTitle("About Hisko Browser")
+        about_dialog.setText("Hisko Browser for **Linux/UCN**")
+        about_dialog.setInformativeText("Built with PyQt6 and Qt WebEngine.")
+        about_dialog.setIcon(QMessageBox.Icon.Information)
+
+        about_dialog.setStyleSheet("""
+            QMessageBox {
+                background-color: #2f3136;
+                color: #eee;
+                font-family: 'Poppins';
+            }
+            QMessageBox QLabel {
+                color: #eee;
+                font-size: 11pt;
+            }
+            QMessageBox QPushButton {
+                background-color: #5865F2;
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                border-radius: 5px;
+                font-size: 10pt;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #40444b;
+            }
+        """)
+        about_dialog.exec()
+
+    def add_to_history(self, title, url):
+        if not self.session_history or self.session_history[-1][1] != url:
+            self.session_history.append((title, url))
+            current_history_widget = next((self.tabs.widget(i) for i in range(self.tabs.count()) if isinstance(self.tabs.widget(i), HistoryWidget)), None)
+            if current_history_widget:
+                current_history_widget.add_entry(title, url)
+
+
+    def show_history_page(self):
+        self.add_new_tab(self.HISTORY_PAGE_URL, "History")
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+
+    palette = QPalette()
+    palette.setColor(QPalette.ColorRole.Window, QColor(31, 32, 35))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor(220, 220, 220))
+    palette.setColor(QPalette.ColorRole.Base, QColor(47, 49, 54))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(31, 32, 35))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(220, 220, 220))
+    palette.setColor(QPalette.ColorRole.ToolTipText, QColor(220, 220, 220))
+    palette.setColor(QPalette.ColorRole.Text, QColor(220, 220, 220))
+    palette.setColor(QPalette.ColorRole.Button, QColor(47, 49, 54))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor(220, 220, 220))
+    palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
+    palette.setColor(QPalette.ColorRole.Link, QColor(88, 101, 242))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor(88, 101, 242))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
+    app.setPalette(palette)
+
+    window = WebBrowser()
+    window.show()
+    sys.exit(app.exec())

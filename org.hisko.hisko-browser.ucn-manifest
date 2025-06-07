@@ -1,0 +1,6 @@
+--UCN PACKAGE MANAGER MANIFEST--
+name:org.hisko.hisko-browser
+manifest version:1.0.0
+developer:Hisko Community
+publisher:Hisko Community
+exec:python3 ~/.ucndata/packages/org.hisko.hisko-browser/org.hisko.hisko-browser/bin/hisko

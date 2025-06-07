@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Hisko Browser
+Exec=ucn run org.hisko.hisko-browser
+Icon=~/.ucndata/packages/org.hisko.hisko-browser/org.hisko.hisko-browser/icon/icon.png
+Type=Application
+Categories=Internet;
+Terminal=false
+
